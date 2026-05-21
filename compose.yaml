@@ -1,0 +1,68 @@
+services:
+  server:
+    image: ghcr.io/mariasfiraiala/server:latest
+    restart: always
+    depends_on:
+      - log-parser
+    cap_add:
+      - NET_BIND_SERVICE
+    ports:
+      - 443:${PORT:-8443}
+    command:
+      - --output-dir=/var/log/keyboard
+      - --port=${PORT:-8443}
+    environment:
+      - GIN_MODE=release
+    volumes:
+      - keyboard_logs:/var/log/keyboard
+    networks:
+      - backend
+
+  log-parser:
+    image: fluent/fluent-bit:latest
+    restart: always
+    volumes:
+      - keyboard_logs:/var/log/keyboard:ro
+      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./fluent-bit/strip_path.lua:/fluent-bit/etc/strip_path.lua:ro
+      - fluentbit_db:/var/log/
+    depends_on:
+      - loki
+    networks:
+      - loki
+
+  loki:
+    image: grafana/loki:latest
+    restart: always
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - loki
+      - grafana
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: always
+    ports:
+      - 3000:3000
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - loki
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+    networks:
+      - grafana
+
+volumes:
+  keyboard_logs:
+  fluentbit_db:
+  grafana_data:
+
+networks:
+  backend:
+  loki:
+  grafana:
+    
