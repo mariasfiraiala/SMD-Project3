@@ -10,3 +10,7 @@ app/build
 
 # Ignore certificate files
 app/src/main/assets/*.crt
+
+# Ignore keystore files
+*.jks
+app/*.jks

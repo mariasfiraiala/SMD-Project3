@@ -23,6 +23,15 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(System.getenv("KEYSTORE_PATH") ?: "upload-keystore.jks")
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("KEY_ALIAS")
+            keyPassword = System.getenv("KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -30,7 +39,7 @@ android {
             
             val serverHost = System.getenv("TELEMETRY_HOST") ?: "127.0.0.1"
             val serverPort = System.getenv("TELEMETRY_PORT") ?: "443"
-
+            signingConfig = signingConfigs.getByName("release")
             buildConfigField("String", "TELEMETRY_HOST", "\"$serverHost\"")
             buildConfigField("int", "TELEMETRY_PORT", serverPort)
         }
