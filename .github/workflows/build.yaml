@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-    branches:
-      - main
 
 jobs:
   build-and-deploy:
@@ -51,10 +49,10 @@ jobs:
       - name: Build and Sign APK
         working-directory: ./app
         env:
-          KEYSTORE_PATH: ./app/keystore.jks
+          KEYSTORE_PATH: ${{ github.workspace }}/app/app/keystore.jks
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'myalias' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'password123' }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || 'password123' }}
+          KEYSTORE_PASSWORD: ${{ secrets.STORE_PASSWORD || 'password123' }}
           TELEMETRY_HOST: ${{ secrets.TELEMETRY_HOST }}
           TELEMETRY_PORT: ${{ secrets.TELEMETRY_PORT }}
         run: |
@@ -65,7 +63,7 @@ jobs:
             -keysize 2048 \
             -validity 10000 \
             -alias "$KEY_ALIAS" \
-            -storepass "$STORE_PASSWORD" \
+            -storepass "$KEYSTORE_PASSWORD" \
             -keypass "$KEY_PASSWORD" \
             -dname "CN=Developer, OU=SMD, O=TEMA3, L=Bucharest, S=Bucharest, C=RO"
 
@@ -75,17 +73,21 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: app/app/build/outputs/apk/release/app-release.apk
+          file: ./app/app/build/outputs/apk/release/app-release.apk
           asset_name: CalculatoristulKeyboard.apk
-          tag: ${{ github.ref }}
+          tag: ${{ github.ref_name }}
           overwrite: true
-          generate_release_notes: true
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: mariasfiraiala
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and Push Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./server
           push: true
-          tags: |
-            ghcr.io/mariasfiraiala/server:latest
-            ghcr.io/mariasfiraiala/server:${{ github.ref_name }}
+          tags: ghcr.io/mariasfiraiala/server:latest
