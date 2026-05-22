@@ -1,0 +1,91 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install mkcert
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3-tools
+          curl -JLO "https://dl.filippo.io/mkcert/latest?for=linux/amd64"
+          chmod +x mkcert-v*-linux-amd64
+          sudo mv mkcert-v*-linux-amd64 /usr/local/bin/mkcert
+
+      - name: Generate Root CA and Server Certificates
+        env:
+          TELEMETRY_HOST: ${{ secrets.TELEMETRY_HOST }}
+        run: |
+          mkcert -install
+
+          ASSETS_DIR="app/app/src/main/assets"
+          mkdir -p $ASSETS_DIR
+          cp "$(mkcert -CAROOT)/rootCA.pem" $ASSETS_DIR/ca.crt
+          
+          # 2. Generate server certificate and key
+          mkdir -p server/certs
+
+          mkcert -cert-file server/certs/server.crt -key-file server/certs/server.key localhost 127.0.0.1 $TELEMETRY_HOST
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Build and Sign APK
+        working-directory: ./app
+        env:
+          KEYSTORE_PATH: ./app/keystore.jks
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'myalias' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'password123' }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || 'password123' }}
+          TELEMETRY_HOST: ${{ secrets.TELEMETRY_HOST }}
+          TELEMETRY_PORT: ${{ secrets.TELEMETRY_PORT }}
+        run: |
+          # Generate a new keystore on the fly using keytool
+          keytool -genkey -v \
+            -keystore "$KEYSTORE_PATH" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -alias "$KEY_ALIAS" \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" \
+            -dname "CN=Developer, OU=SMD, O=TEMA3, L=Bucharest, S=Bucharest, C=RO"
+
+          ./gradlew assembleRelease
+
+      - name: Upload APK to GitHub Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: app/app/build/outputs/apk/release/app-release.apk
+          asset_name: CalculatoristulKeyboard.apk
+          tag: ${{ github.ref }}
+          overwrite: true
+          generate_release_notes: true
+
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          push: true
+          tags: |
+            ghcr.io/mariasfiraiala/server:latest
+            ghcr.io/mariasfiraiala/server:${{ github.ref_name }}
