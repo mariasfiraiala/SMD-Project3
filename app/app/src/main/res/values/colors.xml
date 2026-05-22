@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="kb_bg_light">#ECEFF1</color>
+    <color name="key_bg_light">#FFFFFF</color>
+    <color name="key_text_light">#000000</color>
+
+    <color name="kb_bg_dark">#121212</color>
+    <color name="key_bg_dark">#1E1E1E</color>
+    <color name="key_text_dark">#FFFFFF</color>
+
+    <color name="kb_bg_terminal">#000000</color>
+    <color name="key_bg_terminal">#0A0A0A</color>
+    <color name="key_text_terminal">#00FF00</color>
+</resources>
